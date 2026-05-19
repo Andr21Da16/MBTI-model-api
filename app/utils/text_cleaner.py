@@ -38,7 +38,6 @@ LEAKAGE_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# Idiomas soportados como entrada
 SUPPORTED_LANGUAGES = {
     'es': 'Español',
     'en': 'Inglés'
@@ -46,29 +45,16 @@ SUPPORTED_LANGUAGES = {
 
 
 def detect_language(text: str) -> str:
-    """
-    Detecta el idioma del texto.
-    Retorna el código ISO (ej: 'es', 'en').
-    Si no puede detectarlo, asume inglés.
-    """
     try:
-        lang = detect(text)
-        return lang
+        return detect(text)
     except LangDetectException:
         return 'en'
 
 
 def translate_to_english(text: str, source_lang: str) -> str:
-    """
-    Traduce el texto al inglés si no está en inglés.
-    Usa GoogleTranslator de deep-translator (sin API key).
-    """
     if source_lang == 'en':
         return text
-
     try:
-        # GoogleTranslator tiene límite de 5000 caracteres por llamada
-        # Si el texto es más largo lo dividimos en chunks
         max_chars = 4500
         if len(text) <= max_chars:
             translated = GoogleTranslator(
@@ -77,7 +63,6 @@ def translate_to_english(text: str, source_lang: str) -> str:
             ).translate(text)
             return translated if translated else text
 
-        # Dividir en chunks y traducir por partes
         chunks = [
             text[i:i + max_chars]
             for i in range(0, len(text), max_chars)
@@ -89,24 +74,15 @@ def translate_to_english(text: str, source_lang: str) -> str:
                 target='en'
             ).translate(chunk)
             translated_chunks.append(result if result else chunk)
-
         return ' '.join(translated_chunks)
-
     except Exception:
-        # Si falla la traducción devolvemos el texto original
         return text
 
 
-def preprocess_text(text: str) -> tuple[str, str, str]:
+def preprocess_text(text: str):
     """
-    Pipeline completo:
-    1. Detecta el idioma
-    2. Traduce al inglés si es necesario
-    3. Aplica limpieza y normalización
-
-    Retorna una tupla:
-        (texto_procesado, idioma_detectado, texto_traducido)
-    Compatible con Python 3.12 / nltk 3.8.1 / scikit-learn 1.6.1
+    Retorna exactamente una tupla de 3 elementos:
+    (texto_procesado, idioma_detectado, texto_traducido)
     """
     # Paso 0: separar posts por ||| y unir
     text = ' '.join(text.split('|||'))
@@ -114,45 +90,14 @@ def preprocess_text(text: str) -> tuple[str, str, str]:
 
     idioma_detectado = detect_language(text)
 
-    # Paso 2: traducir al inglés si es español
+
     if idioma_detectado == 'es':
         text = translate_to_english(text, 'es')
     elif idioma_detectado not in SUPPORTED_LANGUAGES:
         idioma_detectado = 'en'
 
-    texto_traducido = text
-
-    text = text.lower()
-
-    text = re.sub(r'http\S+|www\.\S+|https\S+', '', text)
-
-    text = LEAKAGE_PATTERN.sub('', text)
-
-    text = re.sub(r'[^a-z\s]', '', text)
-
-    text = re.sub(r'\s+', ' ', text).strip()
-
-    tokens = word_tokenize(text)
-
-    tokens = [
-        t for t in tokens
-        if t not in STOP_WORDS and len(t) > 2
-    ]
-
-    tokens = [LEMMATIZER.lemmatize(t) for t in tokens]
-
-    return ' '.join(tokens), idioma_detectado, texto_traducido
-
-
-def preprocess_text(text: str) -> str:
-    """
-    Pipeline de preprocesamiento idéntico al usado
-    durante el entrenamiento del modelo.
-    Compatible con Python 3.12 / nltk 3.8.1 / scikit-learn 1.6.1
-    """
    
-    text = ' '.join(text.split('|||'))
-
+    texto_traducido = str(text)
 
     text = text.lower()
 
@@ -173,4 +118,5 @@ def preprocess_text(text: str) -> str:
 
     tokens = [LEMMATIZER.lemmatize(t) for t in tokens]
 
-    return ' '.join(tokens)
+    texto_final = ' '.join(tokens)
+    return texto_final, idioma_detectado, texto_traducido
